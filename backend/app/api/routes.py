@@ -1,8 +1,34 @@
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+from app.services.ingestion import ingest_file, query_collection
 from app.services.rag import ask
+
+router = APIRouter()
+
+class IngestRequest(BaseModel):
+    file_path: str
+    client_id: str
+
+class QueryRequest(BaseModel):
+    question: str
+    client_id: str
 
 class AskRequest(BaseModel):
     question: str
     client_id: str
+
+@router.post("/ingest")
+def ingest(req: IngestRequest):
+    try:
+        result = ingest_file(req.file_path, req.client_id)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/query-test")
+def query_test(req: QueryRequest):
+    chunks = query_collection(req.question, req.client_id)
+    return {"question": req.question, "relevant_chunks": chunks}
 
 @router.post("/ask")
 def ask_question(req: AskRequest):
