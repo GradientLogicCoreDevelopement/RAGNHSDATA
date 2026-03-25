@@ -27,6 +27,11 @@ def ingest_file(file_path: str, client_id: str) -> dict:
 
     # Clean column names — strip whitespace just in case
     df.columns = df.columns.str.strip()
+    df.columns = (df.columns
+    .str.replace('%', 'pct', regex=False)
+    .str.replace('.', '_', regex=False)
+    .str.strip()
+    )
 
     # Write to SQLite — replace table if it exists
     engine = get_engine()
