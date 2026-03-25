@@ -6,18 +6,9 @@ client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
 
 def ask(question: str, client_id: str) -> dict:
-    """
-    Full RAG pipeline:
-    1. Find relevant chunks from ChromaDB
-    2. Build a prompt with those chunks as context
-    3. Send to Claude and return the answer
-    """
-
-    # Step 1 — retrieve relevant chunks
     chunks = query_collection(question, client_id)
     context = "\n\n---\n\n".join(chunks)
 
-    # Step 2 — build the prompt
     system_prompt = """You are a data analyst assistant. 
 You are given context extracted from a client's dataset.
 Answer the user's question using only the provided context.
@@ -29,7 +20,6 @@ If the context doesn't contain enough information to answer, say so clearly."""
 
 Question: {question}"""
 
-    # Step 3 — call Claude
     message = client.messages.create(
         model="claude-sonnet-4-5",
         max_tokens=1024,
