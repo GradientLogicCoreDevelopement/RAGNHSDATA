@@ -54,13 +54,15 @@ The table name is: {TABLE_NAME}
 RULES:
 - Return ONLY the SQL query, nothing else — no explanation, no markdown, no backticks
 - Always filter age_breakdown = 'All' and sex_breakdown = 'All' unless the question specifically asks for a breakdown by age or sex
-- Always filter data_frequency = 'Annual' unless the question asks for a specific time period
+- Always filter data_frequency = 'yearly' unless the question asks for a specific time period
 - Never use SUM() on indirectly_standardised_percentage_rate — use AVG(), MAX() or MIN() instead
 - For readmission counts use the numerator column
 - For rates use indirectly_standardised_percentage_rate
 - Use LIKE for text searches on dimension_description (e.g. WHERE dimension_description LIKE '%Manchester%')
 - Always include dimension_description in SELECT when filtering by dimension
 - Limit results to 20 rows unless the question asks for more
+- Column names for confidence intervals are: lower_confidence_limit_95pct, upper_confidence_intervals_95pct, lower_confidence_intervals_99_8pct, upper_confidence_intervals_99_8pct
+- For statistical significance questions, select both the rate AND confidence interval columns for each dimension being compared
 - If comparing ICB and CCG periods, include a comment in the query noting the non-alignment warning"""
 
     response = client.messages.create(
