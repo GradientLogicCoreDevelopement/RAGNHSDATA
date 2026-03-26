@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 from app.core.config import ANTHROPIC_API_KEY
 from app.services.ingestion import run_sql, get_sample_values, TABLE_NAME
+from app.services.analysis import decide_visualisation
 
 client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
@@ -155,9 +156,13 @@ def ask(question: str, client_id: str, file_path: str = None) -> dict:
     # Narrate results
     answer = narrate_results(question, sql, results)
 
+    # Decide visualisation
+    visualisation = decide_visualisation(question, results)
+
     return {
         "question": question,
         "sql_generated": sql,
         "rows_returned": len(results),
-        "answer": answer
+        "answer": answer,
+        "visualisation": visualisation
     }
