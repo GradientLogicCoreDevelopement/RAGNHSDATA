@@ -9,3 +9,4 @@ __pycache__/
 .env
 *.env
 frontend/node_modules/
+working_files
