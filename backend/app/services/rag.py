@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 from app.core.config import ANTHROPIC_API_KEY
 from app.services.ingestion import run_sql, get_sample_values, TABLE_NAME
-from app.services.analysis import decide_visualisation
+from app.services.analysis import narrate_and_visualise
 
 client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
@@ -145,7 +145,6 @@ def ask(question: str, client_id: str, file_path: str = None) -> dict:
     try:
         results = run_sql(sql)
     except Exception as e:
-        # If SQL fails, return the error with the generated SQL for debugging
         return {
             "question": question,
             "sql_generated": sql,
@@ -153,16 +152,13 @@ def ask(question: str, client_id: str, file_path: str = None) -> dict:
             "answer": f"The query failed to execute. Generated SQL was:\n{sql}\n\nError: {str(e)}"
         }
 
-    # Narrate results
-    answer = narrate_results(question, sql, results)
-
-    # Decide visualisation
-    visualisation = decide_visualisation(question, results)
+    # Single call for narration + visualisation
+    analysis = narrate_and_visualise(question, sql, results)
 
     return {
         "question": question,
         "sql_generated": sql,
         "rows_returned": len(results),
-        "answer": answer,
-        "visualisation": visualisation
+        "answer": analysis["answer"],
+        "visualisation": analysis["visualisation"]
     }

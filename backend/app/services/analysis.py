@@ -5,72 +5,76 @@ from app.core.config import ANTHROPIC_API_KEY
 client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
 
-def decide_visualisation(question: str, results: list[dict]) -> dict:
+def narrate_and_visualise(question: str, sql: str, results: list[dict]) -> dict:
     """
-    Ask Claude to decide the best visualisation type and
-    return structured data ready for the frontend to render.
+    Single Claude call that returns both:
+    - A narrative answer to the question
+    - Structured visualisation data for the frontend
+    Replaces the previous two separate calls.
     """
     if not results:
-        return {"type": "narrative", "data": None}
+        return {
+            "answer": "The query returned no results. This may mean the data doesn't exist for the filters applied, or the question needs rephrasing.",
+            "visualisation": {"type": "narrative", "data": None}
+        }
 
-    results_sample = results[:100]
-    results_text = json.dumps(results_sample, default=str)
+    results_sample = results[:50]
+    results_text = json.dumps(results_sample, indent=2, default=str)
     columns = list(results[0].keys()) if results else []
 
-    system_prompt = """You are a data visualisation expert working with NHS analytics data.
+    system_prompt = """You are an NHS data analyst assistant with expertise in data visualisation.
 
-Given a question and query results, decide the best way to visualise the data and return a JSON object.
+                        Given a question and SQL query results, return a JSON object with exactly two keys: "answer" and "visualisation".
 
-VISUALISATION RULES:
-- bar_chart: use for comparing values across categories (e.g. rates by ICB, counts by region)
-- line_chart: use for trends over time (e.g. rate changes across years)
-- table: use for detailed comparisons with multiple columns, statistical significance, or when exact numbers matter most
-- narrative: use when the answer is a single number, yes/no, or explanation with no meaningful chart
+                        ANSWER RULES:
+                        - Write a clear, concise narrative answering the question
+                        - Lead with the most important finding
+                        - Use specific numbers from the data
+                        - Note any important caveats (e.g. ICB/CCG alignment issues)
+                        - If results are a ranked list, highlight the top 3-5 items
+                        - Keep it professional but readable for NHS managers and analysts
+                        - Use markdown formatting — bold key numbers, use bullet points for lists
 
-RESPONSE FORMAT — return ONLY valid JSON, nothing else:
+                        VISUALISATION RULES — choose the best type:
+                        - bar_chart: comparing values across categories (rates by ICB, counts by region)
+                        - line_chart: trends over time (rate changes across years)
+                        - table: detailed comparisons with multiple columns, statistical significance
+                        - narrative: single number answers, yes/no questions, explanations with no meaningful chart
 
-For bar_chart:
-{
-  "type": "bar_chart",
-  "title": "short descriptive title",
-  "x_axis": "column name for x axis",
-  "y_axis": "column name for y axis",
-  "x_label": "human readable x axis label",
-  "y_label": "human readable y axis label",
-  "data": [{"label": "...", "value": 123.4}, ...]
-}
+                        RESPONSE FORMAT — return ONLY this JSON, no markdown, no backticks:
+                        {
+                        "answer": "your narrative text here with **bold** markdown",
+                        "visualisation": {
+                            "type": "bar_chart",
+                            "title": "short descriptive title under 10 words",
+                            "x_label": "human readable x axis label",
+                            "y_label": "human readable y axis label",
+                            "data": [{"label": "...", "value": 123.4}, ...]
+                        }
+                        }
 
-For line_chart:
-{
-  "type": "line_chart",
-  "title": "short descriptive title",
-  "x_axis": "column name for x axis",
-  "y_axis": "column name for y axis",
-  "x_label": "human readable x axis label",
-  "y_label": "human readable y axis label",
-  "data": [{"label": "...", "value": 123.4}, ...]
-}
+                        For table type use:
+                        {
+                        "answer": "narrative text",
+                        "visualisation": {
+                            "type": "table",
+                            "title": "short title",
+                            "columns": ["col1", "col2"],
+                            "rows": [["val1", "val2"], ...]
+                        }
+                        }
 
-For table:
-{
-  "type": "table",
-  "title": "short descriptive title",
-  "columns": ["col1", "col2", "col3"],
-  "rows": [["val1", "val2", "val3"], ...]
-}
+                        For narrative type use:
+                        {
+                        "answer": "narrative text",
+                        "visualisation": {"type": "narrative", "data": null}
+                        }
 
-For narrative:
-{
-  "type": "narrative",
-  "data": null
-}
-
-IMPORTANT:
-- Return ONLY the JSON object — no markdown, no backticks, no explanation
-- For bar and line charts, data must be an array of {label, value} objects
-- Keep titles concise — under 10 words
-- For line charts x axis should always be the time dimension
-- Round numeric values to 2 decimal places"""
+                        IMPORTANT:
+                        - Return ONLY the JSON object
+                        - Round numeric values to 2 decimal places
+                        - For bar and line charts, data must be array of {label, value} objects
+                        - Keep titles concise"""
 
     response = client.messages.create(
         model="claude-sonnet-4-5",
@@ -79,11 +83,12 @@ IMPORTANT:
         messages=[{
             "role": "user",
             "content": f"""Question: {question}
+            SQL used:{sql}
 
-Available columns: {columns}
+            Available columns: {columns}
 
-Data:
-{results_text}"""
+            Results: {results_text}
+            {'Note: Results truncated to 50 rows.' if len(results) > 50 else ''}"""
         }]
     )
 
@@ -96,7 +101,14 @@ Data:
         raw = raw.rsplit("```", 1)[0]
 
     try:
-        return json.loads(raw.strip())
+        parsed = json.loads(raw.strip())
+        return {
+            "answer": parsed.get("answer", "No answer returned."),
+            "visualisation": parsed.get("visualisation", {"type": "narrative", "data": None})
+        }
     except json.JSONDecodeError:
-        # If parsing fails fall back to narrative
-        return {"type": "narrative", "data": None}
+        # Fallback if JSON parsing fails
+        return {
+            "answer": raw,
+            "visualisation": {"type": "narrative", "data": None}
+        }
