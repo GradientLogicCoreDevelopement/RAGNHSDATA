@@ -10,3 +10,9 @@ __pycache__/
 *.env
 frontend/node_modules/
 working_files/
+backend/data/dataset_registry.md
+backend/data/column_mappings.md
+backend/data/GL01_Readmissions_schema_description.md
+backend/data/GL02_HES_MAR_schema_description.md
+backend/data/*.db
+backend/data/*.csv
